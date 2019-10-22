@@ -29,6 +29,8 @@ class Serializer {
 
         this.html = '';
         this.startNode = node;
+        
+        this.goTemplate = false;
     }
 
     //API
@@ -120,7 +122,17 @@ class Serializer {
                 this.html += attr.namespace + ':' + attr.name;
             }
 
-            this.html += '="' + value + '"';
+            if (attr.name[0] === '{') {
+                this.goTemplate = true;
+            } else if (attr.name[0] === '}') {
+                this.goTemplate = false;
+            }
+                
+            if (this.goTemplate === true || attr.name === '}}' || attr.name === '}') {
+                this.html += value;
+            } else {
+                this.html += '="' + value + '"';
+            }
         }
     }
 
@@ -165,7 +177,7 @@ Serializer.escapeString = function(str, attrMode) {
     str = str.replace(AMP_REGEX, '&amp;').replace(NBSP_REGEX, '&nbsp;');
 
     if (attrMode) {
-        str = str.replace(DOUBLE_QUOTE_REGEX, '&quot;');
+        // str = str.replace(DOUBLE_QUOTE_REGEX, '&quot;');
     } else {
         str = str.replace(LT_REGEX, '&lt;').replace(GT_REGEX, '&gt;');
     }

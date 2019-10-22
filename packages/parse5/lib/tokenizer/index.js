@@ -221,6 +221,7 @@ class Tokenizer {
 
         this.state = DATA_STATE;
         this.returnState = '';
+        this.touchGoBracket = false;
 
         this.charRefCode = -1;
         this.tempBuff = [];
@@ -410,7 +411,9 @@ class Tokenizer {
     }
 
     _leaveAttrName(toState) {
-        if (Tokenizer.getTokenAttr(this.currentToken, this.currentAttr.name) === null) {
+        if (Tokenizer.getTokenAttr(this.currentToken, this.currentAttr.name) === null 
+        || this.currentAttr.name[0] === '{'
+        || this.currentAttr.name[0] === '(') {
             this.currentToken.attrs.push(this.currentAttr);
         } else {
             this._err(ERR.duplicateAttribute);
@@ -1182,6 +1185,7 @@ class Tokenizer {
         if (isWhitespace(cp)) {
             return;
         }
+        
 
         if (cp === $.SOLIDUS || cp === $.GREATER_THAN_SIGN || cp === $.EOF) {
             this._reconsumeInState(AFTER_ATTRIBUTE_NAME_STATE);
@@ -1189,7 +1193,8 @@ class Tokenizer {
             this._err(ERR.unexpectedEqualsSignBeforeAttributeName);
             this._createAttr('=');
             this.state = ATTRIBUTE_NAME_STATE;
-        } else {
+        } 
+        else {
             this._createAttr('');
             this._reconsumeInState(ATTRIBUTE_NAME_STATE);
         }
@@ -1211,7 +1216,8 @@ class Tokenizer {
         } else if (cp === $.NULL) {
             this._err(ERR.unexpectedNullCharacter);
             this.currentAttr.name += unicode.REPLACEMENT_CHARACTER;
-        } else {
+        }
+        else {
             this.currentAttr.name += toChar(cp);
         }
     }
@@ -1262,7 +1268,13 @@ class Tokenizer {
     // Attribute value (double-quoted) state
     //------------------------------------------------------------------
     [ATTRIBUTE_VALUE_DOUBLE_QUOTED_STATE](cp) {
-        if (cp === $.QUOTATION_MARK) {
+    if (cp === 0x7b)
+        this.touchGoBracket = true;
+        
+    if (cp === 0x7d) 
+        this.touchGoBracket = false;
+
+    if (cp === $.QUOTATION_MARK && this.touchGoBracket === false) {
             this.state = AFTER_ATTRIBUTE_VALUE_QUOTED_STATE;
         } else if (cp === $.AMPERSAND) {
             this.returnState = ATTRIBUTE_VALUE_DOUBLE_QUOTED_STATE;
@@ -1320,7 +1332,8 @@ class Tokenizer {
         ) {
             this._err(ERR.unexpectedCharacterInUnquotedAttributeValue);
             this.currentAttr.value += toChar(cp);
-        } else if (cp === $.EOF) {
+        } 
+        else if (cp === $.EOF) {
             this._err(ERR.eofInTag);
             this._emitEOFToken();
         } else {
@@ -1333,7 +1346,8 @@ class Tokenizer {
     [AFTER_ATTRIBUTE_VALUE_QUOTED_STATE](cp) {
         if (isWhitespace(cp)) {
             this._leaveAttrValue(BEFORE_ATTRIBUTE_NAME_STATE);
-        } else if (cp === $.SOLIDUS) {
+        } 
+        else if (cp === $.SOLIDUS) {
             this._leaveAttrValue(SELF_CLOSING_START_TAG_STATE);
         } else if (cp === $.GREATER_THAN_SIGN) {
             this._leaveAttrValue(DATA_STATE);
@@ -1341,7 +1355,24 @@ class Tokenizer {
         } else if (cp === $.EOF) {
             this._err(ERR.eofInTag);
             this._emitEOFToken();
-        } else {
+        }
+       else if (cp === 0x7b || cp === 0x28) {                                     
+        // when case like class="{{ . }}{{ end }}> , make {{ after " a attr.
+            //this._creatAttr('');
+    //        this.state = ATTRIBUTE_NAME_STATE;
+         //   this._leaveAttrValue(BEFORE_ATTRIBUTE_NAME_STATE);
+            this._err(ERR.missingWhitespaceBetweenAttributes);
+            this._createAttr('');
+            //this.currentAttr.name += toChar(cp);
+            //this.state = ATTRIBUTE_NAME_STATE;
+    //        this.state = ATTRIBUTE_NAME_STATE;
+ //           this._leaveAttrValue(ATTRIBUTE_NAME_STATE);
+            this._reconsumeInState(ATTRIBUTE_NAME_STATE);
+ //           this._consume();
+ 
+            //this.currentAttr.value += toChar(cp);
+        }
+        else {
             this._err(ERR.missingWhitespaceBetweenAttributes);
             this._reconsumeInState(BEFORE_ATTRIBUTE_NAME_STATE);
         }
